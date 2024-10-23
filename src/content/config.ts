@@ -6,5 +6,5 @@ export const collections = {
 	docs: defineCollection({ schema: docsSchema({
 		extend: baseSchema,
 	}),
- }),
+}),
 };
