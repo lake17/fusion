@@ -1,0 +1,108 @@
+---
+import util from "node:util"
+import child_process from "node:child_process"
+import { Card, CardGrid, Badge } from "@astrojs/starlight/components"
+import team from "../data/team_webex.json"
+import { Image } from "astro:assets"
+import eng from "../assets/fusioncare-engineer.webp"
+import { getCollection } from "astro:content"
+import type { CollectionEntry } from "astro:content"
+
+const exec = util.promisify(child_process.exec)
+
+// TODO: find out how to do this properly - extend type?
+const f: CollectionEntry<"docs">[] = await getCollection("docs")
+const ff: CollectionEntry<"docs">[] = f.filter((x) => {
+  if (x.data.created) {return x}
+})
+const fff: CollectionEntry<"docs">[] = ff.sort((a, b) => {
+  let adc = a.data.created
+  let bdc = b.data.created
+  if (adc && bdc) {
+    const x = new Date(adc)
+    const y = new Date(bdc)
+    return y.getTime() - x.getTime()
+  }
+  throw new Error("cunt");
+})
+
+let team_stats = team.map((m) => {
+  return {
+    name: m.name,
+    pic: m.avatar,
+    cmd: `rg -q --stats 'owner: ${m.email}' ./src/content/docs | head -n 2 | awk '{print$1}'`,
+    output: "",
+  }
+})
+async function executeCommands(
+  commands: { name: string; cmd: string; output: string }[]
+) {
+  for (const commandObj of commands) {
+    const { stdout } = await exec(commandObj.cmd)
+    commandObj.output = stdout.trim()
+  }
+}
+await executeCommands(team_stats)
+
+team_stats.sort((a, b) => {
+  const x = Number(a.output)
+  const y = Number(b.output)
+  return y - x
+})
+
+
+---
+
+<CardGrid>
+  <Card title="Newest Documents" icon="open-book">
+    <table style="border-collapse: collapse; width: 100%;">
+      <thead>
+        <tr>
+          <th style="text-align: left;">Title</th>
+          <th style="text-align: right;">Created</th>
+        </tr>
+      </thead>
+      <tbody>
+        {
+          fff.map((m) => (
+            <tr>
+              <td><a href={"/"+m.slug+"/"}>{m.data.title}</a></td>
+              <td style="text-align: right; white-space: nowrap;">{(m.data.created ? new Date(m.data.created).toISOString().split('T')[0] : "duh i broked sumfin")}</td>
+            </tr>
+          ))
+        }
+      </tbody>
+    </table>
+  </Card>
+  <Card title="Leaderboard" icon="rocket">
+    <table style="border-collapse: collapse; width: 100%;">
+      {
+        team_stats.map((m) => ( 
+          <tr>
+            <td style="text-align: center;">
+              {m.pic ? (
+                <Image
+                  src={m.pic}
+                  alt="Avatar"
+                  width="50"
+                  height="50"
+                  style="border-radius: 50%; object-fit: cover;"
+                />
+              ) : (
+                <Image
+                  src={eng}
+                  alt="Avatar"
+                  width="50"
+                  height="50"
+                  style="border-radius: 50%; object-fit: cover;"
+                />
+              )}
+            </td>
+            <td style="text-align: left;">{m.name}</td>
+            <td style="text-align: left;">{m.output}{team_stats[0].output == m.output ? <span>&emsp;</span><Badge text="TOP LAD" size="large" style="color:#fff;background-color:#9F8F5E;border-color:#9F8F5E;"></Badge>:''}</td>
+          </tr>
+        ))
+      }
+    </table>
+  </Card>
+</CardGrid>
